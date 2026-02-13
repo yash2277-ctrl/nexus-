@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
+import { resolveUrl } from '../../utils/api';
 import ChatItem from './ChatItem';
 import { getConversationName, getOtherUser } from '../../utils/helpers';
 import { 
@@ -65,7 +66,7 @@ export default function Sidebar() {
             className="relative group"
           >
             {user?.avatar ? (
-              <img src={user.avatar} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-500/30" />
+              <img src={resolveUrl(user.avatar)} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-500/30" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
                 {user?.display_name?.[0]?.toUpperCase()}
@@ -204,7 +205,7 @@ export default function Sidebar() {
                     className="w-full sidebar-item"
                   >
                     {u.avatar ? (
-                      <img src={u.avatar} className="w-9 h-9 rounded-full object-cover" alt="" />
+                      <img src={resolveUrl(u.avatar)} className="w-9 h-9 rounded-full object-cover" alt="" />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
                         {u.display_name?.[0]?.toUpperCase()}

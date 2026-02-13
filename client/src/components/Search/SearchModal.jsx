@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { formatTime, formatDateSeparator, getAvatarGradient, getInitials, truncate } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { X, Search as SearchIcon, MessageSquare, ArrowRight } from 'lucide-react';
 
 export default function SearchModal({ onClose }) {
@@ -93,7 +94,7 @@ export default function SearchModal({ onClose }) {
                   className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-dark-700/50 transition-all text-left"
                 >
                   {msg.sender_avatar ? (
-                    <img src={msg.sender_avatar} className="w-10 h-10 rounded-full object-cover flex-shrink-0" alt="" />
+                    <img src={resolveUrl(msg.sender_avatar)} className="w-10 h-10 rounded-full object-cover flex-shrink-0" alt="" />
                   ) : (
                     <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getAvatarGradient(msg.sender_id)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
                       {getInitials(msg.sender_name || '')}

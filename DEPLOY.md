@@ -1,230 +1,207 @@
-# Nexus Chat — Deployment Guide (Hostinger VPS / Node.js Hosting)
+# Nexus Chat — Deployment Guide
 
-## Prerequisites
+## Architecture: Vercel (Frontend) + Render (Backend) + Hostinger (DNS)
 
-- Node.js 18+ on the server
-- npm 9+
-- A domain with SSL certificate (HTTPS is **mandatory** for video/audio calling)
-
----
-
-## 1. Upload the Project
-
-Upload your entire project folder to your Hostinger server (via SSH, Git, or File Manager).
-
-Exclude these folders/files (they'll be regenerated):
-- `node_modules/`
-- `client/node_modules/`
-- `client/dist/`
-- `*.db` (database files — unless you want to keep existing data)
-
----
-
-## 2. Install Dependencies
-
-SSH into your server and navigate to the project folder:
-
-```bash
-cd /path/to/nexus-chat
-npm run install:all
 ```
-
-This installs dependencies for both the server and client.
-
----
-
-## 3. Configure Environment
-
-Edit the `.env` file in the project root:
-
-```env
-# REQUIRED — Change these for production!
-NODE_ENV=production
-PORT=3001
-JWT_SECRET=your_very_long_random_secret_key_here_minimum_32_chars
-
-# Your domain(s) — comma-separated if multiple
-CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-
-# Server binding
-HOST=0.0.0.0
-
-# Optional — Custom TURN server for better video call reliability
-# The app already includes free TURN servers, but for production scale:
-# TURN_URL=turn:your-turn-server.com:3478
-# TURN_USERNAME=your_username
-# TURN_CREDENTIAL=your_password
-```
-
-### Generate a secure JWT secret:
-```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+Browser → yourdomain.com (Hostinger DNS → Vercel)
+           ├── Frontend (React/Vite) ← Served by Vercel
+           └── API + WebSocket calls → nexus-chat.onrender.com (Render)
+                                         ├── REST API (/api/*)
+                                         ├── Socket.IO (WebSocket)
+                                         ├── File uploads (/uploads/*)
+                                         └── SQLite database
 ```
 
 ---
 
-## 4. Build the Frontend
+## Step 1: Deploy Backend on Render
 
-```bash
-npm run build
+### 1.1 Create a Web Service on Render
+
+1. Go to [render.com](https://render.com) → **New** → **Web Service**
+2. Connect your GitHub repo: `yash2277-ctrl/nexus-`
+3. Configure:
+
+| Setting | Value |
+|---------|-------|
+| **Name** | `nexus-chat` (or any name) |
+| **Root Directory** | *(leave empty — use project root)* |
+| **Runtime** | `Node` |
+| **Build Command** | `npm install` |
+| **Start Command** | `node server/index.js` |
+| **Instance Type** | Free (or paid for always-on) |
+
+### 1.2 Set Environment Variables on Render
+
+Go to **Environment** tab and add:
+
+| Key | Value |
+|-----|-------|
+| `NODE_ENV` | `production` |
+| `JWT_SECRET` | *(generate: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)* |
+| `CORS_ORIGINS` | `https://your-app.vercel.app,https://yourdomain.com,https://www.yourdomain.com` |
+| `PORT` | `10000` *(Render uses 10000 by default, or leave empty — Render sets it)* |
+| `TURN_URL` | *(optional, e.g. `turn:your-turn-server.com:3478`)* |
+| `TURN_USERNAME` | *(optional)* |
+| `TURN_CREDENTIAL` | *(optional)* |
+
+### 1.3 Deploy
+
+Click **Create Web Service**. Wait for the build to complete.
+
+**Copy your Render URL** — it will look like: `https://nexus-chat.onrender.com`
+
+Test it: visit `https://nexus-chat.onrender.com/api/health` — should return `{"status":"ok"}`
+
+---
+
+## Step 2: Deploy Frontend on Vercel
+
+### 2.1 Create a Project on Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **Add New** → **Project**
+2. Import your GitHub repo: `yash2277-ctrl/nexus-`
+3. Configure:
+
+| Setting | Value |
+|---------|-------|
+| **Root Directory** | `client` |
+| **Framework Preset** | `Vite` (auto-detected) |
+| **Build Command** | `npm run build` |
+| **Output Directory** | `dist` |
+
+### 2.2 Set Environment Variables on Vercel
+
+Go to **Settings** → **Environment Variables** and add:
+
+| Key | Value |
+|-----|-------|
+| `VITE_API_URL` | `https://nexus-chat.onrender.com` *(your Render URL, NO trailing slash)* |
+
+> **Important**: `VITE_` prefix is required — Vite only exposes env vars starting with `VITE_` to the client.
+
+### 2.3 Deploy
+
+Click **Deploy**. Vercel will build and deploy the frontend.
+
+**Copy your Vercel URL** — it will look like: `https://nexus-chat.vercel.app`
+
+### 2.4 Update Render CORS
+
+Go back to Render → Environment Variables → update `CORS_ORIGINS` to include your Vercel URL:
+```
+https://nexus-chat.vercel.app,https://yourdomain.com,https://www.yourdomain.com
+```
+Redeploy Render after changing this.
+
+---
+
+## Step 3: Hostinger DNS Setup
+
+### 3.1 Point your domain to Vercel
+
+Go to **Hostinger** → **DNS Zone Editor** for your domain.
+
+**Delete** any existing A, AAAA, or CNAME records for `@` and `www` that point to Hostinger's default servers (parking page IPs like `185.185.x.x`).
+
+**Add these records:**
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| **A** | `@` | `76.76.21.21` | 3600 |
+| **CNAME** | `www` | `cname.vercel-dns.com` | 3600 |
+
+### 3.2 Add Domain to Vercel
+
+1. In Vercel → **Settings** → **Domains**
+2. Add `yourdomain.com` and `www.yourdomain.com`
+3. Vercel will auto-provision an SSL certificate
+
+### 3.3 Update Render CORS (again)
+
+Make sure `CORS_ORIGINS` on Render includes your custom domain:
+```
+https://nexus-chat.vercel.app,https://yourdomain.com,https://www.yourdomain.com
 ```
 
-This creates the `client/dist/` folder with the production-optimized React app.
+### 3.4 DNS Records to DELETE
+
+Remove these if they exist (Hostinger default parking records):
+
+| Type | Name | Value (example) |
+|------|------|-----------------|
+| A | @ | `185.185.x.x` (Hostinger default) |
+| AAAA | @ | Any IPv6 address |
+| CNAME | www | `yourdomain.com` or Hostinger parking |
+| A | www | Any Hostinger IP |
 
 ---
 
-## 5. Start the Server
+## Step 4: Verify Everything Works
 
-### Option A: Direct start
-```bash
-npm start
-```
-
-### Option B: Using PM2 (recommended for production)
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start the app
-pm2 start server/index.js --name nexus-chat --env production
-
-# Auto-restart on server reboot
-pm2 startup
-pm2 save
-
-# View logs
-pm2 logs nexus-chat
-```
+1. **Frontend loads**: Visit `https://yourdomain.com` → login page appears
+2. **API health**: Visit `https://nexus-chat.onrender.com/api/health` → `{"status":"ok"}`
+3. **ICE servers**: `https://nexus-chat.onrender.com/api/ice-servers` → STUN+TURN config
+4. **Register & login**: Create account, log in
+5. **Send messages**: Open two browsers, chat between accounts
+6. **File uploads**: Send an image — it should display correctly
+7. **Video/audio calls**: Call between two accounts (HTTPS + TURN = works!)
 
 ---
 
-## 6. Reverse Proxy Setup (Nginx)
+## Required Environment Variables Summary
 
-If Hostinger uses Nginx (most VPS plans do), add this config:
+### Render (Backend) — set in Render dashboard
 
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
+| Variable | Required | Example |
+|----------|----------|---------|
+| `NODE_ENV` | ✅ | `production` |
+| `JWT_SECRET` | ✅ | `a1b2c3d4...` (64+ chars) |
+| `CORS_ORIGINS` | ✅ | `https://nexus-chat.vercel.app,https://yourdomain.com` |
+| `PORT` | ❌ | Render sets automatically |
+| `TURN_URL` | ❌ | `turn:your-server.com:3478` |
+| `TURN_USERNAME` | ❌ | TURN credentials |
+| `TURN_CREDENTIAL` | ❌ | TURN credentials |
 
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
+### Vercel (Frontend) — set in Vercel dashboard
 
-    # SSL certificate (Hostinger usually auto-configures this)
-    ssl_certificate /path/to/certificate.crt;
-    ssl_certificate_key /path/to/private.key;
-
-    # Proxy to Node.js
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # WebSocket timeout
-        proxy_read_timeout 86400;
-    }
-
-    # File upload size limit
-    client_max_body_size 50M;
-}
-```
-
-### Important Nginx notes:
-- The `Upgrade` and `Connection` headers are **required** for WebSocket (Socket.IO)
-- `proxy_read_timeout 86400` keeps WebSocket connections alive
-- `client_max_body_size 50M` matches the Express body limit
+| Variable | Required | Example |
+|----------|----------|---------|
+| `VITE_API_URL` | ✅ | `https://nexus-chat.onrender.com` |
 
 ---
 
-## 7. Hostinger-Specific Setup
+## Troubleshooting
 
-### If using Hostinger VPS:
-1. SSH into your VPS
-2. Install Node.js: `curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt install -y nodejs`
-3. Upload project files
-4. Follow steps 2-6 above
-5. Enable SSL via Hostinger panel or Let's Encrypt
-
-### If using Hostinger Node.js Hosting:
-1. Upload files via File Manager or Git
-2. Set the **entry point** to `server/index.js`
-3. Set environment variables in Hostinger panel:
-   - `NODE_ENV` = `production`
-   - `JWT_SECRET` = (your generated secret)
-   - `CORS_ORIGINS` = `https://yourdomain.com`
-   - `PORT` = (check Hostinger docs — they may assign a port)
-4. Hostinger auto-provisions SSL, so HTTPS will work automatically
-5. Click **Restart** in the Node.js panel
-
----
-
-## 8. Verify Deployment
-
-After deploying, check these:
-
-1. **App loads**: Visit `https://yourdomain.com` — you should see the login page
-2. **API works**: Visit `https://yourdomain.com/api/health` — should return `{"status":"ok"}`
-3. **ICE servers**: Visit `https://yourdomain.com/api/ice-servers` — should return STUN+TURN config
-4. **Register & Login**: Create an account and log in
-5. **Messaging**: Send messages in a chat
-6. **File uploads**: Send an image or file
-7. **Video/Audio calls**: Make a call to another user — this is the critical test!
-
----
-
-## 9. Troubleshooting
+### CORS errors in browser console?
+- The `CORS_ORIGINS` env var on Render must include your exact Vercel/domain URL
+- Include `https://` — e.g. `https://yourdomain.com`, NOT `yourdomain.com`
+- After changing, **redeploy** Render
 
 ### Calls not working?
+1. **Check HTTPS**: Both Vercel and Render use HTTPS by default ✅
+2. **Check ICE servers**: Browser console → `fetch('https://YOUR-RENDER-URL/api/ice-servers').then(r=>r.json()).then(console.log)`
+3. **TURN test**: Visit https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
 
-1. **Check HTTPS**: Open browser console → type `window.isSecureContext`. Must be `true`.
-2. **Check ICE servers**: Open browser console → `fetch('/api/ice-servers').then(r=>r.json()).then(console.log)`. Should show STUN+TURN servers.
-3. **Check WebSocket**: In browser console, you should NOT see "Socket connection error" messages.
-4. **TURN server test**: Visit https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/ — add the TURN server credentials and test connectivity.
+### Images/avatars not loading?
+- Open browser DevTools → Network tab → check if `/uploads/...` requests go to your Render URL
+- If they return 404, the files don't exist on Render's disk (Render's free tier has ephemeral storage)
+- **Solution**: Use a cloud storage service (S3, Cloudinary) for production file storage
 
-### WebSocket connection drops?
-- Check Nginx has `proxy_read_timeout` set to a high value
-- Ensure the `Upgrade` header is being passed through
+### WebSocket won't connect?
+- Check browser console for "Socket connection error" messages
+- Verify `VITE_API_URL` in Vercel env vars points to correct Render URL
+- Render supports WebSockets on all plans
 
-### 502 Bad Gateway?
-- Server isn't running. Check with `pm2 status` or `ps aux | grep node`
-- Port mismatch between Nginx config and `.env` PORT
+### Render free tier "spinning down"?
+- Free Render instances spin down after 15 min of inactivity
+- First request after spin-down takes ~30 seconds
+- **Solution**: Upgrade to Render paid plan ($7/mo) for always-on
 
-### File uploads fail?
-- Check `uploads/` directory exists and has write permissions: `chmod -R 755 uploads/`
-- If behind Nginx, check `client_max_body_size`
-
----
-
-## 10. Architecture Summary
-
-```
-Browser (HTTPS)
-    ↓
-Nginx (SSL termination + reverse proxy)
-    ↓
-Node.js Express Server (port 3001)
-    ├── Static files (client/dist/)
-    ├── REST API (/api/*)
-    ├── File uploads (/uploads/*)
-    ├── Socket.IO (WebSocket for real-time messaging + call signaling)
-    └── SQLite database (nexus_chat.db)
-
-Video/Audio Calls:
-    Browser A ←→ STUN/TURN servers ←→ Browser B
-    (WebRTC peer-to-peer, signaling via Socket.IO)
-```
-
----
-
-## 11. Feature Checklist
+### DNS not working?
+- DNS changes can take up to 48 hours to propagate
+- Use https://dnschecker.org to verify propagation
+- Make sure you deleted old Hostinger parking records
 
 | Feature | Status | Notes |
 |---------|--------|-------|

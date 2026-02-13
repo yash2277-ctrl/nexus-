@@ -26,7 +26,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
 
 const io = new Server(server, {
   cors: {
-    origin: isProduction ? allowedOrigins : '*',
+    origin: allowedOrigins.includes('*') ? true : allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   },
@@ -35,12 +35,12 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
-// Trust proxy (needed behind Hostinger's reverse proxy / Nginx)
+// Trust proxy (needed behind reverse proxy / Nginx / Render)
 app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors({
-  origin: isProduction ? allowedOrigins : '*',
+  origin: allowedOrigins.includes('*') ? true : allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));

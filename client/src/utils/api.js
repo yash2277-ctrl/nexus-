@@ -1,4 +1,15 @@
-const API_BASE = '/api';
+// Backend URL for split deployment (Vercel frontend + Render backend)
+// Set VITE_API_URL to your Render backend URL, e.g. https://nexus-chat.onrender.com
+// Leave empty for same-origin / monolith deployment
+export const BACKEND_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE = `${BACKEND_URL}/api`;
+
+// Resolve relative URLs (e.g. /uploads/...) to absolute backend URLs
+export function resolveUrl(url) {
+  if (!url) return url;
+  if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
+  return `${BACKEND_URL}${url}`;
+}
 
 class ApiClient {
   constructor() {

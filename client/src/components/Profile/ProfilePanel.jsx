@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
+import { BACKEND_URL, resolveUrl } from '../../utils/api';
 import { 
   getConversationName, getConversationAvatar, getOtherUser, 
   getAvatarGradient, getInitials, getLastSeen, formatTime,
@@ -31,7 +32,7 @@ function OwnProfilePanel() {
       if (avatarFile) {
         const formData = new FormData();
         formData.append('file', avatarFile);
-        const res = await fetch('/api/media/upload', {
+        const res = await fetch(`${BACKEND_URL}/api/media/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${useStore.getState().token}` },
           body: formData
@@ -69,7 +70,7 @@ function OwnProfilePanel() {
           <div className="relative mb-4 group">
             {user?.avatar || avatarFile ? (
               <img
-                src={avatarFile ? URL.createObjectURL(avatarFile) : user.avatar}
+                src={avatarFile ? URL.createObjectURL(avatarFile) : resolveUrl(user.avatar)}
                 alt=""
                 className="w-28 h-28 rounded-full object-cover border-4 border-dark-800"
               />
@@ -295,7 +296,7 @@ export default function ProfilePanel() {
         <div className="flex flex-col items-center py-8 px-6">
           <div className="relative mb-4">
             {avatar ? (
-              <img src={avatar} alt="" className="w-24 h-24 rounded-full object-cover border-4 border-dark-800" />
+              <img src={resolveUrl(avatar)} alt="" className="w-24 h-24 rounded-full object-cover border-4 border-dark-800" />
             ) : (
               <div className={`w-24 h-24 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-2xl border-4 border-dark-800`}>
                 {isGroup ? <Users className="w-10 h-10" /> : getInitials(name)}
@@ -448,7 +449,7 @@ export default function ProfilePanel() {
                     <button key={u.id} onClick={() => handleAddMember(u.id)}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-dark-800/50 transition-all">
                       {u.avatar ? (
-                        <img src={u.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
+                        <img src={resolveUrl(u.avatar)} className="w-8 h-8 rounded-full object-cover" alt="" />
                       ) : (
                         <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(u.id)} flex items-center justify-center text-white text-xs font-bold`}>
                           {getInitials(u.display_name)}
@@ -466,7 +467,7 @@ export default function ProfilePanel() {
               {(members.length > 0 ? members : activeConversation.participants || []).map(member => (
                 <div key={member.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-dark-800/30 transition-all group">
                   {member.avatar ? (
-                    <img src={member.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                    <img src={resolveUrl(member.avatar)} className="w-10 h-10 rounded-full object-cover" alt="" />
                   ) : (
                     <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getAvatarGradient(member.id)} flex items-center justify-center text-white text-xs font-bold`}>
                       {getInitials(member.display_name)}
@@ -499,11 +500,11 @@ export default function ProfilePanel() {
                 <div className="grid grid-cols-3 gap-1.5">
                   {sharedMedia.filter(m => m.type === 'image' || m.type === 'video').map(m => (
                     <div key={m.id} className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => window.open(m.media_url, '_blank')}>
+                      onClick={() => window.open(resolveUrl(m.media_url), '_blank')}>
                       {m.type === 'video' ? (
-                        <video src={m.media_url} className="w-full h-full object-cover" preload="metadata" />
+                        <video src={resolveUrl(m.media_url)} className="w-full h-full object-cover" preload="metadata" />
                       ) : (
-                        <img src={m.media_url} className="w-full h-full object-cover" alt="" />
+                        <img src={resolveUrl(m.media_url)} className="w-full h-full object-cover" alt="" />
                       )}
                     </div>
                   ))}

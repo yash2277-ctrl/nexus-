@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { getAvatarGradient, getInitials } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { X, Search, Users, Check, Camera, ArrowRight } from 'lucide-react';
 
 export default function CreateGroupModal({ onClose }) {
@@ -139,7 +140,7 @@ export default function CreateGroupModal({ onClose }) {
                       className={`w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all ${isSelected ? 'bg-primary-500/10' : 'hover:bg-dark-700/50'}`}
                     >
                       {u.avatar ? (
-                        <img src={u.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                        <img src={resolveUrl(u.avatar)} className="w-10 h-10 rounded-full object-cover" alt="" />
                       ) : (
                         <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getAvatarGradient(u.id)} flex items-center justify-center text-white text-sm font-bold`}>
                           {getInitials(u.display_name)}

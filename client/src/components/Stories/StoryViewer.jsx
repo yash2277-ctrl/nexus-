@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { getAvatarGradient, getInitials, formatTime } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { X, ChevronLeft, ChevronRight, Plus, Image, Send, Eye, Trash2 } from 'lucide-react';
 
 export default function StoryViewer({ onClose }) {
@@ -169,7 +170,7 @@ export default function StoryViewer({ onClose }) {
                       <div className={`relative p-0.5 rounded-full ${su.hasUnviewed ? 'bg-gradient-to-tr from-primary-500 to-pink-500' : 'bg-dark-600'}`}>
                         <div className="bg-dark-800 rounded-full p-0.5">
                           {su.avatar ? (
-                            <img src={su.avatar} className="w-12 h-12 rounded-full object-cover" alt="" />
+                            <img src={resolveUrl(su.avatar)} className="w-12 h-12 rounded-full object-cover" alt="" />
                           ) : (
                             <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getAvatarGradient(su.userId)} flex items-center justify-center text-white text-sm font-bold`}>
                               {getInitials(su.displayName)}
@@ -258,7 +259,7 @@ export default function StoryViewer({ onClose }) {
               <div className="absolute top-5 left-0 right-0 z-20 px-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {currentUser?.avatar ? (
-                    <img src={currentUser.avatar} className="w-9 h-9 rounded-full object-cover border-2 border-white/30" alt="" />
+                    <img src={resolveUrl(currentUser.avatar)} className="w-9 h-9 rounded-full object-cover border-2 border-white/30" alt="" />
                   ) : (
                     <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(currentUser?.userId)} flex items-center justify-center text-white text-xs font-bold border-2 border-white/30`}>
                       {getInitials(currentUser?.displayName)}
@@ -283,9 +284,9 @@ export default function StoryViewer({ onClose }) {
               <div className="flex-1 flex items-center justify-center">
                 {currentStory?.media_url ? (
                   currentStory.media_type === 'video' ? (
-                    <video src={currentStory.media_url} className="w-full h-full object-contain" autoPlay muted />
+                    <video src={resolveUrl(currentStory.media_url)} className="w-full h-full object-contain" autoPlay muted />
                   ) : (
-                    <img src={currentStory.media_url} className="w-full h-full object-contain" alt="" />
+                    <img src={resolveUrl(currentStory.media_url)} className="w-full h-full object-contain" alt="" />
                   )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center p-8" style={{ background: currentStory?.background_color || '#6366f1' }}>

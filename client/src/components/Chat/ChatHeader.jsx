@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import { getConversationName, getConversationAvatar, getOtherUser, getLastSeen, getAvatarGradient, getInitials } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { Phone, Video, Search, MoreVertical, Pin, Users, ArrowLeft, Shield, Info } from 'lucide-react';
 import { getSocket } from '../../hooks/useSocket';
 
@@ -67,7 +68,7 @@ export default function ChatHeader() {
         <button className="flex items-center gap-3 cursor-pointer" onClick={() => setShowProfile(true)}>
           <div className="relative">
             {avatar ? (
-              <img src={avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+              <img src={resolveUrl(avatar)} alt="" className="w-10 h-10 rounded-full object-cover" />
             ) : (
               <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm`}>
                 {isGroup ? <Users className="w-5 h-5" /> : getInitials(name)}

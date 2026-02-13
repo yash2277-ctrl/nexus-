@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import useStore from '../store/useStore';
 import { playNotificationSound } from '../utils/helpers';
+import { BACKEND_URL } from '../utils/api';
 import { getPeerConnection, cleanupCall, addPendingCandidate, markRemoteDescSet, flushPendingCandidates } from '../utils/callManager';
 
 let socket = null;
@@ -23,8 +24,8 @@ export function useSocket() {
     if (!isAuthenticated || !token) return;
     if (socket?.connected) return;
 
-    // In production, connect to same origin. In dev, Vite proxy handles it.
-    const socketUrl = window.location.origin;
+    // Connect to backend URL (Render in production, same-origin in dev)
+    const socketUrl = BACKEND_URL || window.location.origin;
 
     socket = io(socketUrl, {
       auth: { token },

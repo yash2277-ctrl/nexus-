@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { formatTime, formatFullDate, getAvatarGradient, getInitials } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { X, Bookmark, MessageSquare, Trash2, ExternalLink } from 'lucide-react';
 
 export default function BookmarksPanel() {
@@ -83,7 +84,7 @@ export default function BookmarksPanel() {
                   {/* Sender info */}
                   <div className="flex items-center gap-2 mb-2">
                     {bookmark.sender_avatar ? (
-                      <img src={bookmark.sender_avatar} className="w-6 h-6 rounded-full object-cover" alt="" />
+                      <img src={resolveUrl(bookmark.sender_avatar)} className="w-6 h-6 rounded-full object-cover" alt="" />
                     ) : (
                       <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${getAvatarGradient(bookmark.sender_id)} flex items-center justify-center text-white text-[8px] font-bold`}>
                         {getInitials(bookmark.sender_name || '')}

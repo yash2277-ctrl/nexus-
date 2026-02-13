@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import api from '../../utils/api';
 import { formatTime, formatFullDate, formatFileSize, formatDuration, getInitials, getAvatarGradient } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { 
   Reply, Forward, Copy, Trash2, Edit3, Pin, Star, Bookmark, MoreHorizontal,
   Check, CheckCheck, Download, Play, Pause, FileText, Smile, Image, Volume2
@@ -108,11 +109,11 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
               <div className="w-64 h-48 bg-dark-700/50 shimmer-bg rounded-xl" />
             )}
             <img
-              src={message.media_url}
+              src={resolveUrl(message.media_url)}
               alt=""
               className={`max-w-full rounded-xl cursor-pointer transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
               onLoad={() => setImageLoaded(true)}
-              onClick={() => window.open(message.media_url, '_blank')}
+              onClick={() => window.open(resolveUrl(message.media_url), '_blank')}
             />
             {message.content && (
               <p className="mt-2 text-sm whitespace-pre-wrap break-words">{message.content}</p>
@@ -124,7 +125,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
         return (
           <div className="relative rounded-xl overflow-hidden max-w-xs">
             <video
-              src={message.media_url}
+              src={resolveUrl(message.media_url)}
               controls
               className="max-w-full rounded-xl"
               preload="metadata"
@@ -170,7 +171,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
             </div>
             <audio
               ref={audioRef}
-              src={message.media_url}
+              src={resolveUrl(message.media_url)}
               onEnded={() => setIsPlaying(false)}
             />
           </div>
@@ -191,7 +192,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
               <p className="text-[10px] opacity-60">{formatFileSize(message.media_size)}</p>
             </div>
             <a
-              href={message.media_url}
+              href={resolveUrl(message.media_url)}
               download
               className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
             >
@@ -253,7 +254,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
         <div className="w-8 flex-shrink-0 flex flex-col justify-end">
           {showAvatar && (
             message.sender_avatar ? (
-              <img src={message.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+              <img src={resolveUrl(message.sender_avatar)} alt="" className="w-8 h-8 rounded-full object-cover" />
             ) : (
               <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] text-white font-bold`}>
                 {getInitials(message.sender_name || '')}

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../../store/useStore';
 import { getSocket } from '../../hooks/useSocket';
+import { BACKEND_URL, resolveUrl } from '../../utils/api';
 import {
   setPeerConnection, getPeerConnection,
   setLocalStream, getLocalStream,
@@ -45,7 +46,7 @@ const DEFAULT_ICE_SERVERS = {
 // Fetch ICE config from server (allows dynamic TURN credentials)
 async function fetchIceServers() {
   try {
-    const res = await fetch('/api/ice-servers');
+    const res = await fetch(`${BACKEND_URL}/api/ice-servers`);
     if (res.ok) {
       const data = await res.json();
       return { iceServers: data.iceServers, iceCandidatePoolSize: 10 };
@@ -480,7 +481,7 @@ export default function CallScreen({ onClose }) {
               </>
             )}
             {targetAvatar ? (
-              <img src={targetAvatar} alt="" className="w-32 h-32 rounded-full object-cover border-4 border-white/10 shadow-2xl relative z-10" />
+              <img src={resolveUrl(targetAvatar)} alt="" className="w-32 h-32 rounded-full object-cover border-4 border-white/10 shadow-2xl relative z-10" />
             ) : (
               <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-4xl font-bold border-4 border-white/10 shadow-2xl relative z-10`}>
                 {getInitials(targetName || 'Unknown')}

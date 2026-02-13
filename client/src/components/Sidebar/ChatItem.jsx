@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import useStore from '../../store/useStore';
 import { getConversationName, getConversationAvatar, getOtherUser, formatTime, truncate, getAvatarGradient, getInitials } from '../../utils/helpers';
+import { resolveUrl } from '../../utils/api';
 import { Check, CheckCheck, Image, Video, Mic, FileText, Pin, Users } from 'lucide-react';
 
 export default function ChatItem({ conversation, isActive, onClick }) {
@@ -42,7 +43,7 @@ export default function ChatItem({ conversation, isActive, onClick }) {
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         {avatar ? (
-          <img src={avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+          <img src={resolveUrl(avatar)} alt="" className="w-12 h-12 rounded-full object-cover" />
         ) : (
           <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm`}>
             {conversation.type === 'group' ? (
