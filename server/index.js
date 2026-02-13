@@ -55,15 +55,8 @@ app.use('/uploads', express.static(uploadsDir, {
   maxAge: isProduction ? '7d' : 0
 }));
 
-// Serve client build in production
-if (isProduction) {
-  const clientDist = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDist, {
-    maxAge: '1y',
-    immutable: true,
-    index: false // Let the catch-all handle index.html
-  }));
-}
+// Note: Frontend is served by Vercel in production
+// Static client build serving removed for split deployment
 
 // Initialize database
 const db = initDB();
@@ -124,12 +117,7 @@ app.get('/api/ice-servers', (req, res) => {
 // Setup Socket.IO
 setupSocketHandlers(io, db);
 
-// Serve client in production (SPA catch-all)
-if (isProduction) {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
-  });
-}
+// Note: SPA routing handled by Vercel in production
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
