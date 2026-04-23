@@ -55,7 +55,7 @@ app.use('/uploads', express.static(uploadsDir, {
   maxAge: isProduction ? '7d' : 0
 }));
 
-// Note: Frontend is served by Vercel in production
+// Note: Frontend is served as a separate static build in production
 // Static client build serving removed for split deployment
 
 // Initialize database
@@ -117,7 +117,7 @@ app.get('/api/ice-servers', (req, res) => {
 // Setup Socket.IO
 setupSocketHandlers(io, db);
 
-// Note: SPA routing handled by Vercel in production
+// Note: SPA routing handled by the hosting provider in production
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
