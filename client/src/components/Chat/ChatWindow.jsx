@@ -126,7 +126,7 @@ export default function ChatWindow() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full relative">
+    <div className="flex-1 flex flex-col h-full min-h-0 min-w-0 relative">
       <ChatHeader />
 
       {/* Wallpaper toggle button */}
@@ -191,7 +191,7 @@ export default function ChatWindow() {
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 md:px-8 py-4 scroll-smooth relative"
+        className="flex-1 overflow-y-auto min-h-0 px-4 md:px-8 py-4 scroll-smooth relative"
         style={wallpaperStyle}
       >
         {/* Loading more indicator */}

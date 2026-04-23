@@ -1,222 +1,106 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { io } from 'socket.io-client';
+import client, { appwriteConfig, account } from '../appwrite';
 import useStore from '../store/useStore';
 import { playNotificationSound } from '../utils/helpers';
-import { BACKEND_URL } from '../utils/api';
-import { getPeerConnection, cleanupCall, addPendingCandidate, markRemoteDescSet, flushPendingCandidates } from '../utils/callManager';
 
-let socket = null;
+const { databaseId, messageCollectionId } = appwriteConfig;
+
+// Since we removed socket.io, we will mock the socket object for backward compatibility
+// in the components that might still call socket.emit()
+const mockSocket = {
+  emit: (event, data) => {
+    // Appwrite doesn't have ephemeral socket events.
+    // Real-time actions must be done via database updates or Appwrite Functions
+    console.debug(`[Mock Socket] emit ${event}`, data);
+  },
+  disconnect: () => {},
+  connected: true
+};
 
 export function getSocket() {
-  return socket;
+  return mockSocket;
 }
 
 export function useSocket() {
-  const socketRef = useRef(null);
+  const unsubscribeRef = useRef(null);
   const { 
-    user, token, isAuthenticated,
-    addMessage, updateMessage, removeMessage, updateReactions,
-    setTyping, setUserOnline, addConversation, updateConversation,
-    activeConversation, loadConversations
+    user, isAuthenticated,
+    addMessage, updateMessage, removeMessage
   } = useStore();
 
   const connect = useCallback(() => {
-    if (!isAuthenticated || !token) return;
-    if (socket?.connected) return;
+    if (!isAuthenticated) return;
+    
+    // Prevent multiple subscriptions
+    if (unsubscribeRef.current) return;
 
-    // Connect to backend URL (Render in production, same-origin in dev)
-    const socketUrl = BACKEND_URL || window.location.origin;
+    console.log('🔌 Connecting to Appwrite Realtime...');
+    
+    // Subscribe to messages collection
+    const channel = `databases.${databaseId}.collections.${messageCollectionId}.documents`;
+    
+    const unsubscribe = client.subscribe(channel, response => {
+      const { events, payload } = response;
+      console.log('Appwrite Realtime Event:', events, payload);
 
-    socket = io(socketUrl, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      timeout: 20000,
-      // For production behind reverse proxy with HTTPS
-      secure: window.location.protocol === 'https:',
-      rejectUnauthorized: false
-    });
+      // Check if it belongs to our user
+      const isParticipant = payload.senderId === user?.$id || payload.receiverId === user?.$id;
+      if (!isParticipant) return;
 
-    socketRef.current = socket;
+      // Handle Appwrite Events
+      if (events.includes('databases.*.collections.*.documents.*.create')) {
+        // Map payload to our app's message format
+        const message = {
+          id: payload.$id,
+          conversation_id: user?.$id === payload.senderId ? payload.receiverId : payload.senderId,
+          sender_id: payload.senderId,
+          content: payload.content,
+          created_at: payload.timestamp,
+          // Stubs
+          is_pinned: 0,
+          reactions: []
+        };
+        
+        addMessage(message);
+        if (message.sender_id !== user?.$id) {
+          playNotificationSound();
+        }
+      }
 
-    socket.on('connect', () => {
-      console.log('🔌 Socket connected, transport:', socket.io.engine.transport.name);
-    });
+      if (events.includes('databases.*.collections.*.documents.*.update')) {
+        updateMessage({
+          id: payload.$id,
+          content: payload.content,
+          updated_at: payload.timestamp
+        });
+      }
 
-    socket.on('connect_error', (err) => {
-      console.error('🔌 Socket connection error:', err.message);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('reconnect', (attempt) => {
-      console.log('🔌 Socket reconnected after', attempt, 'attempts');
-    });
-
-    // Message events
-    socket.on('new_message', (message) => {
-      addMessage(message);
-      if (message.sender_id !== user?.id) {
-        playNotificationSound();
+      if (events.includes('databases.*.collections.*.documents.*.delete')) {
+        removeMessage(payload.$id);
       }
     });
 
-    socket.on('message_edited', (message) => {
-      updateMessage(message);
-    });
+    unsubscribeRef.current = unsubscribe;
 
-    socket.on('message_deleted', ({ messageId }) => {
-      removeMessage(messageId);
-    });
-
-    socket.on('message_reaction', ({ messageId, reactions }) => {
-      updateReactions(messageId, reactions);
-    });
-
-    socket.on('message_pinned', ({ messageId, isPinned }) => {
-      updateMessage({ id: messageId, is_pinned: isPinned ? 1 : 0 });
-    });
-
-    socket.on('messages_read', ({ conversationId, userId }) => {
-      // Update read status in UI
-    });
-
-    // Typing indicators
-    socket.on('typing_indicator', ({ conversationId, userId, isTyping }) => {
-      if (userId !== user?.id) {
-        setTyping(conversationId, userId, isTyping);
-      }
-    });
-
-    // User online status
-    socket.on('user_online', ({ userId, isOnline, lastSeen }) => {
-      setUserOnline(userId, isOnline, lastSeen);
-    });
-
-    // Conversation events
-    socket.on('new_conversation', (conv) => {
-      addConversation(conv);
-    });
-
-    socket.on('conversation_updated', ({ conversationId, lastMessage }) => {
-      updateConversation(conversationId, { lastMessage, updated_at: lastMessage.created_at });
-    });
-
-    socket.on('group_updated', (conv) => {
-      updateConversation(conv.id, conv);
-    });
-
-    socket.on('members_updated', ({ conversationId, participants }) => {
-      updateConversation(conversationId, { participants });
-    });
-
-    socket.on('member_left', ({ conversationId }) => {
-      loadConversations();
-    });
-
-    socket.on('removed_from_group', ({ conversationId }) => {
-      loadConversations();
-    });
-
-    // Poll updates
-    socket.on('poll_updated', ({ pollId, messageId, options }) => {
-      const { messages } = useStore.getState();
-      const msg = messages.find(m => m.id === messageId);
-      if (msg) {
-        updateMessage({ id: messageId, poll: { ...msg.poll, options } });
-      }
-    });
-
-    // Call events
-    socket.on('incoming_call', (data) => {
-      useStore.getState().setActiveCall({
-        type: 'incoming',
-        callType: data.callType,
-        callerId: data.callerId,
-        callerName: data.callerName,
-        callerAvatar: data.callerAvatar,
-        conversationId: data.conversationId,
-        offer: data.offer
-      });
-    });
-
-    socket.on('call_answered', ({ answer }) => {
-      console.log('📞 call_answered received');
-      const pc = getPeerConnection();
-      if (pc && pc.signalingState !== 'closed') {
-        pc.setRemoteDescription(new RTCSessionDescription(answer))
-          .then(() => {
-            console.log('📞 Remote description set (answer), flushing candidates');
-            markRemoteDescSet();
-            return flushPendingCandidates();
-          })
-          .catch(err => console.error('Failed to set remote description:', err));
-      }
-    });
-
-    socket.on('call_rejected', () => {
-      cleanupCall();
-      useStore.getState().setActiveCall(null);
-    });
-
-    socket.on('call_ended', () => {
-      cleanupCall();
-      useStore.getState().setActiveCall(null);
-    });
-
-    socket.on('ice_candidate', ({ candidate }) => {
-      const pc = getPeerConnection();
-      if (pc && pc.signalingState !== 'closed' && pc.remoteDescription) {
-        // PC exists and remote description is set - add directly
-        pc.addIceCandidate(new RTCIceCandidate(candidate))
-          .catch(err => console.warn('Failed to add ICE candidate:', err));
-      } else {
-        // Buffer the candidate - will be flushed after remote description is set
-        console.log('📞 Buffering ICE candidate (PC or remote desc not ready)');
-        addPendingCandidate(candidate);
-      }
-    });
-
-    // Note collaboration
-    socket.on('note_content_update', ({ noteId, content, editedBy }) => {
-      // Handle real-time note updates
-    });
-
-    // Story events
-    socket.on('new_story', () => {
-      useStore.getState().loadStories();
-    });
-
-    socket.on('story_reaction', ({ storyId, emoji, from }) => {
-      playNotificationSound();
-    });
-
-    return socket;
-  }, [isAuthenticated, token, user?.id]);
+    return mockSocket;
+  }, [isAuthenticated, user?.$id]);
 
   useEffect(() => {
     connect();
     return () => {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
     };
   }, [connect]);
 
-  // Join/leave conversation rooms
+  // Join/leave conversation rooms (stubbed)
   useEffect(() => {
-    if (socket && activeConversation) {
-      socket.emit('join_conversation', { conversationId: activeConversation.id });
-    }
-  }, [activeConversation?.id]);
+    // Rooms are handled intrinsically by the Appwrite Subscription filtering logic above
+  }, []);
 
-  return socketRef.current;
+  return mockSocket;
 }
 
 export default useSocket;

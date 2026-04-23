@@ -56,7 +56,7 @@ export default function ChatHeader() {
   };
 
   return (
-    <div className="h-16 px-4 flex items-center justify-between bg-dark-900/80 backdrop-blur-xl border-b border-white/5 z-30 relative">
+    <div className="h-16 px-4 flex items-center justify-between flex-shrink-0 bg-dark-900/80 backdrop-blur-xl border-b border-white/5 z-30 relative">
       <div className="flex items-center gap-3">
         <button
           onClick={() => setActiveConversation(null)}
@@ -74,7 +74,7 @@ export default function ChatHeader() {
                 {isGroup ? <Users className="w-5 h-5" /> : getInitials(name)}
               </div>
             )}
-            {!isGroup && otherUser?.is_online && (
+            {!isGroup && !!otherUser?.is_online && (
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-dark-900" />
             )}
           </div>

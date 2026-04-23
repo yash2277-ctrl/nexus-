@@ -57,7 +57,7 @@ export default function Sidebar() {
   const hasUnviewedStories = stories.some(s => s.hasUnviewed && s.userId !== user?.id);
 
   return (
-    <div className="w-[380px] h-full flex flex-col bg-dark-900 border-r border-white/5 flex-shrink-0">
+    <div className="w-full h-full flex flex-col bg-dark-900 border-r border-white/5 flex-shrink-0">
       {/* Header */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -163,7 +163,7 @@ export default function Sidebar() {
       </div>
 
       {/* Tabs */}
-      <div className="px-4 py-1 flex gap-1">
+      <div className="px-4 py-1 flex gap-1 overflow-x-auto no-scrollbar">
         {['chats', 'groups', 'status', 'all'].map(tab => (
           <button
             key={tab}
@@ -227,7 +227,7 @@ export default function Sidebar() {
       </AnimatePresence>
 
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto px-2 py-1">
+      <div className="flex-1 overflow-y-auto px-2 py-1 min-h-0">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <div className="w-16 h-16 rounded-2xl bg-dark-800/50 flex items-center justify-center mb-4">

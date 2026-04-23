@@ -202,7 +202,7 @@ export default function MessageInput() {
 
       recordingInterval.current = setInterval(() => {
         recordingTimeRef.current += 1;
-        setRecordingTime(t => t + 1);
+        setRecordingTime(recordingTimeRef.current);
       }, 1000);
     } catch (err) {
       console.error('Microphone access denied:', err);
@@ -229,7 +229,7 @@ export default function MessageInput() {
   if (!activeConversation) return null;
 
   return (
-    <div className="relative z-10">
+    <div className="relative z-10 flex-shrink-0">
       {/* Reply preview */}
       <AnimatePresence>
         {replyTo && (
@@ -420,7 +420,11 @@ export default function MessageInput() {
                           {EMOJI_LIST.map(emoji => (
                             <button
                               key={emoji}
-                              onClick={() => { setMessage(prev => prev + emoji); inputRef.current?.focus(); }}
+                              type="button"
+                              onClick={() => {
+                                setMessage(prev => prev + emoji);
+                                inputRef.current?.focus();
+                              }}
                               className="text-xl hover:bg-white/10 rounded-lg p-1.5 transition-colors hover:scale-110"
                             >
                               {emoji}

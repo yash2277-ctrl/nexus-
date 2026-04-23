@@ -1,358 +1,174 @@
-// Backend URL for split deployment (Vercel frontend + Render backend)
-// Set VITE_API_URL to your Render backend URL, e.g. https://nexus-chat.onrender.com
-// Leave empty for same-origin / monolith deployment
-export const BACKEND_URL = import.meta.env.VITE_API_URL || '';
-const API_BASE = `${BACKEND_URL}/api`;
+import client, { account, databases, avatars, appwriteConfig } from '../appwrite';
+import { ID, Query } from 'appwrite';
 
-// Resolve relative URLs (e.g. /uploads/...) to absolute backend URLs
+const { databaseId, userCollectionId, messageCollectionId } = appwriteConfig;
+
+// We export resolveUrl to handle legacy paths
 export function resolveUrl(url) {
   if (!url) return url;
   if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
-  return `${BACKEND_URL}${url}`;
+  return url;
 }
+
+// Fallback BACKEND_URL for components expecting it
+export const BACKEND_URL = '';
 
 class ApiClient {
   constructor() {
-    this.token = localStorage.getItem('nexus_token');
+    this.user = null;
+    this.sessionId = localStorage.getItem('nexus_session');
   }
 
-  setToken(token) {
-    this.token = token;
-    if (token) {
-      localStorage.setItem('nexus_token', token);
-    } else {
-      localStorage.removeItem('nexus_token');
-    }
-  }
-
-  getToken() {
-    return this.token || localStorage.getItem('nexus_token');
-  }
-
-  async request(endpoint, options = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers
-    };
-
-    const token = this.getToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers
-    });
-
-    if (response.status === 401) {
-      this.setToken(null);
-      window.location.reload();
-      throw new Error('Unauthorized');
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
-    }
-
-    return data;
-  }
-
-  // Auth
+  // --- Auth & Account ---
   async register(data) {
-    const res = await this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data)
+    const { email, password, name } = data;
+    const userAccount = await account.create(ID.unique(), email, password, name);
+    const session = await account.createEmailPasswordSession(email, password);
+    localStorage.setItem('nexus_session', session.$id);
+    
+    let avatarUrl = avatars.getInitials(name).toString();
+    
+    const userDoc = await databases.createDocument(databaseId, userCollectionId, userAccount.$id, {
+      email,
+      name,
+      username: name.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random()*100),
+      avatar: avatarUrl
     });
-    this.setToken(res.token);
-    return res;
+
+    return { user: userDoc, token: session.$id };
   }
 
   async login(data) {
-    const res = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-    this.setToken(res.token);
-    return res;
+    const { email, password } = data;
+    const session = await account.createEmailPasswordSession(email, password);
+    localStorage.setItem('nexus_session', session.$id);
+    
+    const currAccount = await account.get();
+    
+    let userDoc;
+    try {
+      userDoc = await databases.getDocument(databaseId, userCollectionId, currAccount.$id);
+    } catch (e) {
+      userDoc = await databases.createDocument(databaseId, userCollectionId, currAccount.$id, {
+        email: currAccount.email,
+        name: currAccount.name,
+        username: currAccount.name.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random()*100),
+        avatar: avatars.getInitials(currAccount.name).toString()
+      });
+    }
+
+    return { user: userDoc, token: session.$id };
   }
 
   async getMe() {
-    return this.request('/auth/me');
+    try {
+      const currAccount = await account.get();
+      return await databases.getDocument(databaseId, userCollectionId, currAccount.$id);
+    } catch (e) {
+      throw new Error('Not logged in');
+    }
+  }
+
+  async logout() {
+    try {
+      await account.deleteSession('current');
+    } catch(e) {}
+    localStorage.removeItem('nexus_session');
   }
 
   async updateProfile(data) {
-    return this.request('/auth/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data)
+    const currAccount = await account.get();
+    if (data.name) {
+      await account.updateName(data.name);
+    }
+    return databases.updateDocument(databaseId, userCollectionId, currAccount.$id, {
+      name: data.name,
+      status: data.status,
+      avatar: data.avatar
     });
   }
 
   async storePublicKey(publicKey) {
-    return this.request('/auth/public-key', {
-      method: 'POST',
-      body: JSON.stringify({ publicKey })
-    });
+    return Promise.resolve();
   }
 
-  // Users
+  // --- Users ---
   async searchUsers(q) {
-    return this.request(`/users/search?q=${encodeURIComponent(q)}`);
+    const response = await databases.listDocuments(databaseId, userCollectionId, [
+        Query.search('username', q)
+    ]);
+    return response.documents;
   }
 
   async getUsers() {
-    return this.request('/users');
+    const response = await databases.listDocuments(databaseId, userCollectionId);
+    return response.documents;
   }
 
   async getUser(id) {
-    return this.request(`/users/${id}`);
+    return databases.getDocument(databaseId, userCollectionId, id);
+  }
+  
+  async getUserPublicKey() {
+    return { publicKey: null };
   }
 
-  async getUserPublicKey(id) {
-    return this.request(`/users/${id}/public-key`);
-  }
-
-  // Conversations
+  // --- Conversations & Messages ---
   async getConversations() {
-    return this.request('/messages/conversations');
+    return [];
   }
 
   async createPrivateConversation(userId) {
-    return this.request('/messages/conversations/private', {
-      method: 'POST',
-      body: JSON.stringify({ userId })
-    });
+    return { id: userId, isGroup: false };
   }
 
-  // Messages
-  async getMessages(conversationId, before = null) {
-    let url = `/messages/conversations/${conversationId}/messages`;
-    if (before) url += `?before=${before}`;
-    return this.request(url);
+  async getMessages(conversationId) {
+    const user = await account.get();
+    const response = await databases.listDocuments(databaseId, messageCollectionId, [
+      Query.limit(100),
+      Query.orderDesc('timestamp')
+    ]);
+    
+    // Manual filter since OR queries can be complex if not indexed
+    const msgs = response.documents.filter(m => 
+      (m.senderId === user.$id && m.receiverId === conversationId) ||
+      (m.senderId === conversationId && m.receiverId === user.$id)
+    );
+    
+    return msgs.reverse();
   }
 
   async sendMessage(conversationId, data) {
-    return this.request(`/messages/conversations/${conversationId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify(data)
+    const userAccount = await account.get();
+    return databases.createDocument(databaseId, messageCollectionId, ID.unique(), {
+        senderId: userAccount.$id,
+        receiverId: conversationId,
+        content: data.content || data.fileUrl || '',
+        timestamp: new Date().toISOString()
     });
   }
 
   async editMessage(messageId, content) {
-    return this.request(`/messages/messages/${messageId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ content })
+    return databases.updateDocument(databaseId, messageCollectionId, messageId, { 
+      content,
     });
   }
 
   async deleteMessage(messageId) {
-    return this.request(`/messages/messages/${messageId}`, {
-      method: 'DELETE'
-    });
+    return databases.deleteDocument(databaseId, messageCollectionId, messageId);
   }
 
-  async reactToMessage(messageId, emoji) {
-    return this.request(`/messages/messages/${messageId}/react`, {
-      method: 'POST',
-      body: JSON.stringify({ emoji })
-    });
-  }
-
-  async pinMessage(messageId) {
-    return this.request(`/messages/messages/${messageId}/pin`, {
-      method: 'POST'
-    });
-  }
-
-  async starMessage(messageId) {
-    return this.request(`/messages/messages/${messageId}/star`, {
-      method: 'POST'
-    });
-  }
-
-  async bookmarkMessage(messageId, tags = [], note = '') {
-    return this.request(`/messages/messages/${messageId}/bookmark`, {
-      method: 'POST',
-      body: JSON.stringify({ tags, note })
-    });
-  }
-
-  async getBookmarks() {
-    return this.request('/messages/bookmarks');
-  }
-
-  async forwardMessage(messageId, conversationIds) {
-    return this.request(`/messages/messages/${messageId}/forward`, {
-      method: 'POST',
-      body: JSON.stringify({ conversationIds })
-    });
-  }
-
-  async markAsRead(conversationId, messageId) {
-    return this.request(`/messages/conversations/${conversationId}/read`, {
-      method: 'POST',
-      body: JSON.stringify({ messageId })
-    });
-  }
-
-  async searchMessages(q, conversationId = null) {
-    let url = `/messages/search?q=${encodeURIComponent(q)}`;
-    if (conversationId) url += `&conversationId=${conversationId}`;
-    return this.request(url);
-  }
-
-  async getPinnedMessages(conversationId) {
-    return this.request(`/messages/conversations/${conversationId}/pinned`);
-  }
-
-  // Scheduled messages
-  async scheduleMessage(data) {
-    return this.request('/messages/scheduled', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async getScheduledMessages() {
-    return this.request('/messages/scheduled');
-  }
-
-  // Groups
-  async createGroup(data) {
-    return this.request('/groups', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async updateGroup(groupId, data) {
-    return this.request(`/groups/${groupId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async addGroupMembers(groupId, userIds) {
-    return this.request(`/groups/${groupId}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ userIds })
-    });
-  }
-
-  async removeGroupMember(groupId, userId) {
-    return this.request(`/groups/${groupId}/members/${userId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  async leaveGroup(groupId) {
-    return this.request(`/groups/${groupId}/leave`, {
-      method: 'POST'
-    });
-  }
-
-  async createPoll(groupId, data) {
-    return this.request(`/groups/${groupId}/poll`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async votePoll(pollId, optionId) {
-    return this.request(`/groups/polls/${pollId}/vote`, {
-      method: 'POST',
-      body: JSON.stringify({ optionId })
-    });
-  }
-
-  // Notes
-  async getNotes(conversationId) {
-    return this.request(`/groups/${conversationId}/notes`);
-  }
-
-  async createNote(conversationId, data) {
-    return this.request(`/groups/${conversationId}/notes`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async updateNote(noteId, data) {
-    return this.request(`/groups/notes/${noteId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
-  }
-
-  // Stories
-  async getStories() {
-    return this.request('/stories');
-  }
-
-  async createStory(data) {
-    return this.request('/stories', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async viewStory(storyId) {
-    return this.request(`/stories/${storyId}/view`, {
-      method: 'POST'
-    });
-  }
-
-  async reactToStory(storyId, emoji) {
-    return this.request(`/stories/${storyId}/react`, {
-      method: 'POST',
-      body: JSON.stringify({ emoji })
-    });
-  }
-
-  async deleteStory(storyId) {
-    return this.request(`/stories/${storyId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  // Media upload
-  async uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const token = this.getToken();
-    const response = await fetch(`${API_BASE}/media/upload`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData
-    });
-
-    return response.json();
-  }
-
-  async uploadBase64(data, type, extension) {
-    return this.request('/media/upload-base64', {
-      method: 'POST',
-      body: JSON.stringify({ data, type, extension })
-    });
-  }
-
-  async uploadAvatar(file) {
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    const token = this.getToken();
-    const response = await fetch(`${API_BASE}/media/avatar`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData
-    });
-
-    return response.json();
-  }
+  // Stubs
+  async reactToMessage() { return {}; }
+  async pinMessage() { return {}; }
+  async starMessage() { return {}; }
+  async markAsRead() { return {}; }
+  async searchMessages() { return []; }
+  async bookmarkMessage() { return {}; }
+  async getBookmarks() { return []; }
+  async forwardMessage() { return {}; }
+  async getPinnedMessages() { return []; }
 }
 
-export const api = new ApiClient();
+const api = new ApiClient();
 export default api;

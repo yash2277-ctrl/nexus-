@@ -74,7 +74,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    const { password: _, two_factor_secret: __, ...safeUser } = user;
+    const safeUser = db.prepare('SELECT id, username, email, display_name, avatar, bio, status, theme FROM users WHERE id = ?').get(user.id);
     res.json({ token, user: safeUser });
   } catch (err) {
     console.error('Login error:', err);

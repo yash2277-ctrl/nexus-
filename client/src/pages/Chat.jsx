@@ -25,12 +25,14 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-dark-950">
+    <div className="w-full h-[100dvh] flex overflow-hidden bg-dark-950">
       {/* Sidebar */}
-      <Sidebar />
+      <div className={`${activeConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[380px] flex-shrink-0 h-full max-w-full`}>
+        <Sidebar className="w-full h-full" />
+      </div>
 
       {/* Main content */}
-      <div className="flex-1 flex relative">
+      <div className={`flex-1 flex flex-col min-h-0 min-w-0 relative h-full max-w-full ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
         <AnimatePresence mode="wait">
           {activeConversation ? (
             <motion.div
@@ -39,7 +41,7 @@ export default function ChatPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col min-h-0 min-w-0"
             >
               <ChatWindow />
             </motion.div>
@@ -48,7 +50,7 @@ export default function ChatPage() {
               key="welcome"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex-1"
+              className="flex-1 flex flex-col min-h-0 min-w-0"
             >
               <WelcomeScreen />
             </motion.div>
@@ -63,7 +65,7 @@ export default function ChatPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 400, opacity: 0 }}
               transition={{ type: 'spring', damping: 25 }}
-              className="w-[380px] border-l border-white/5 bg-dark-900 flex-shrink-0"
+              className="absolute inset-y-0 right-0 z-50 w-full md:relative md:w-[380px] md:z-auto border-l border-white/5 bg-dark-900 flex-shrink-0"
             >
               <ProfilePanel />
             </motion.div>
@@ -75,7 +77,7 @@ export default function ChatPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 400, opacity: 0 }}
               transition={{ type: 'spring', damping: 25 }}
-              className="w-[380px] border-l border-white/5 bg-dark-900 flex-shrink-0"
+              className="absolute inset-y-0 right-0 z-50 w-full md:relative md:w-[380px] md:z-auto border-l border-white/5 bg-dark-900 flex-shrink-0"
             >
               <BookmarksPanel />
             </motion.div>

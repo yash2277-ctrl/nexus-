@@ -334,7 +334,11 @@ export default function CallScreen({ onClose }) {
 
   // Initialize call on mount
   useEffect(() => {
-    if (!activeCall || initDoneRef.current) return;
+    if (!activeCall) {
+      initDoneRef.current = false;
+      return;
+    }
+    if (initDoneRef.current) return;
     initDoneRef.current = true;
 
     if (activeCall.type === 'incoming') {

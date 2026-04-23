@@ -104,9 +104,9 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
     switch (message.type) {
       case 'image':
         return (
-          <div className="relative rounded-xl overflow-hidden max-w-xs">
+          <div className="relative rounded-xl overflow-hidden w-[240px] sm:w-[320px] max-w-full">
             {!imageLoaded && (
-              <div className="w-64 h-48 bg-dark-700/50 shimmer-bg rounded-xl" />
+              <div className="w-full aspect-video bg-dark-700/50 shimmer-bg rounded-xl" />
             )}
             <img
               src={resolveUrl(message.media_url)}
@@ -123,7 +123,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
 
       case 'video':
         return (
-          <div className="relative rounded-xl overflow-hidden max-w-xs">
+          <div className="relative rounded-xl overflow-hidden w-[240px] sm:w-[320px] max-w-full">
             <video
               src={resolveUrl(message.media_url)}
               controls
@@ -347,10 +347,10 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
 
           {/* Meta info */}
           <div className={`flex items-center gap-1.5 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-            {message.is_edited && !message.is_deleted && (
+            {!!message.is_edited && !message.is_deleted && (
               <span className="text-[9px] opacity-40">edited</span>
             )}
-            {message.is_pinned ? (
+            {!!message.is_pinned ? (
               <Pin className="w-2.5 h-2.5 opacity-40 rotate-45" />
             ) : null}
             <span className="text-[10px] opacity-40">
