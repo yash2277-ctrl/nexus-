@@ -7,7 +7,7 @@ const TOKEN_KEY = 'nexus_token';
 function mapAppwriteError(err) {
   if (err?.message) return err.message;
   if (err instanceof TypeError && /fetch/i.test(err.message || '')) {
-    return 'Network/CORS error. Add your Vercel domain as a Web Platform in Appwrite and verify VITE_APPWRITE_* env vars.';
+    return 'Network/CORS error. Add your Appwrite-hosted domain as a Web Platform in Appwrite and verify VITE_APPWRITE_* env vars.';
   }
   return 'Request failed';
 }
