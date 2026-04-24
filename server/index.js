@@ -35,7 +35,7 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
-// Trust proxy (needed behind reverse proxy / Nginx / Render)
+// Trust proxy (needed behind a reverse proxy or tunnel)
 app.set('trust proxy', 1);
 
 // Middleware
@@ -55,8 +55,7 @@ app.use('/uploads', express.static(uploadsDir, {
   maxAge: isProduction ? '7d' : 0
 }));
 
-// Note: Frontend is served by Vercel in production
-// Static client build serving removed for split deployment
+// The client is served separately during development and through the same origin when tunneled.
 
 // Initialize database
 const db = initDB();
@@ -117,7 +116,7 @@ app.get('/api/ice-servers', (req, res) => {
 // Setup Socket.IO
 setupSocketHandlers(io, db);
 
-// Note: SPA routing handled by Vercel in production
+// SPA routing is handled by the client dev server / static host.
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
