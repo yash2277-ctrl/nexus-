@@ -14,12 +14,13 @@ function mapAppwriteError(err) {
 
 function requireConfig() {
   const missing = [];
+  if (!appwriteConfig.url) missing.push('VITE_APPWRITE_ENDPOINT');
   if (!appwriteConfig.projectId) missing.push('VITE_APPWRITE_PROJECT_ID');
   if (!databaseId) missing.push('VITE_APPWRITE_DATABASE_ID');
   if (!userCollectionId) missing.push('VITE_APPWRITE_USER_COLLECTION_ID');
   if (!messageCollectionId) missing.push('VITE_APPWRITE_MESSAGE_COLLECTION_ID');
   if (missing.length) {
-    throw new Error(`Missing env vars: ${missing.join(', ')}`);
+    throw new Error(`Missing Appwrite config: ${missing.join(', ')}`);
   }
 }
 
