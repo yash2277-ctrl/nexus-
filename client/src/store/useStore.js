@@ -125,7 +125,7 @@ export const useStore = create((set, get) => ({
         set({ messages: [...messages, message] });
       }
       // Mark as read if not own message
-      if (message.sender_id !== user?.id) {
+      if (message.sender_id !== (user?.id || user?.$id)) {
         api.markAsRead(activeConversation.id, message.id).catch(() => {});
       }
     }

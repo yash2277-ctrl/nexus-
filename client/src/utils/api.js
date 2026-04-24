@@ -2,6 +2,26 @@ import client, { account, databases, avatars, appwriteConfig } from '../appwrite
 import { ID, Query } from 'appwrite';
 
 const { databaseId, userCollectionId, messageCollectionId } = appwriteConfig;
+const TOKEN_KEY = 'nexus_token';
+
+function mapAppwriteError(err) {
+  if (err?.message) return err.message;
+  if (err instanceof TypeError && /fetch/i.test(err.message || '')) {
+    return 'Network/CORS error. Add your Vercel domain as a Web Platform in Appwrite and verify VITE_APPWRITE_* env vars.';
+  }
+  return 'Request failed';
+}
+
+function requireConfig() {
+  const missing = [];
+  if (!appwriteConfig.projectId) missing.push('VITE_APPWRITE_PROJECT_ID');
+  if (!databaseId) missing.push('VITE_APPWRITE_DATABASE_ID');
+  if (!userCollectionId) missing.push('VITE_APPWRITE_USER_COLLECTION_ID');
+  if (!messageCollectionId) missing.push('VITE_APPWRITE_MESSAGE_COLLECTION_ID');
+  if (missing.length) {
+    throw new Error(`Missing env vars: ${missing.join(', ')}`);
+  }
+}
 
 // We export resolveUrl to handle legacy paths
 export function resolveUrl(url) {
@@ -16,48 +36,78 @@ export const BACKEND_URL = '';
 class ApiClient {
   constructor() {
     this.user = null;
-    this.sessionId = localStorage.getItem('nexus_session');
+    this.sessionId = localStorage.getItem(TOKEN_KEY);
+  }
+
+  setToken(token) {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+    this.sessionId = token || null;
   }
 
   // --- Auth & Account ---
   async register(data) {
-    const { email, password, name } = data;
-    const userAccount = await account.create(ID.unique(), email, password, name);
-    const session = await account.createEmailPasswordSession(email, password);
-    localStorage.setItem('nexus_session', session.$id);
-    
-    let avatarUrl = avatars.getInitials(name).toString();
-    
-    const userDoc = await databases.createDocument(databaseId, userCollectionId, userAccount.$id, {
-      email,
-      name,
-      username: name.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random()*100),
-      avatar: avatarUrl
-    });
+    requireConfig();
+    try {
+      const email = data.email;
+      const password = data.password;
+      const name = data.displayName || data.name || data.username || 'User';
+      const username = (data.username || name)
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, 50);
 
-    return { user: userDoc, token: session.$id };
+      const userAccount = await account.create(ID.unique(), email, password, name);
+      const session = await account.createEmailPasswordSession(email, password);
+      this.setToken(session.$id);
+
+      const avatarUrl = avatars.getInitials(name).toString();
+
+      const userDoc = await databases.createDocument(databaseId, userCollectionId, userAccount.$id, {
+        email,
+        name,
+        username: username || `user${Math.floor(Math.random() * 10000)}`,
+        avatar: avatarUrl,
+        status: 'Hey there! I am using Nexus Chat.'
+      });
+
+      return { user: userDoc, token: session.$id };
+    } catch (err) {
+      throw new Error(mapAppwriteError(err));
+    }
   }
 
   async login(data) {
-    const { email, password } = data;
-    const session = await account.createEmailPasswordSession(email, password);
-    localStorage.setItem('nexus_session', session.$id);
-    
-    const currAccount = await account.get();
-    
-    let userDoc;
+    requireConfig();
     try {
-      userDoc = await databases.getDocument(databaseId, userCollectionId, currAccount.$id);
-    } catch (e) {
-      userDoc = await databases.createDocument(databaseId, userCollectionId, currAccount.$id, {
-        email: currAccount.email,
-        name: currAccount.name,
-        username: currAccount.name.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random()*100),
-        avatar: avatars.getInitials(currAccount.name).toString()
-      });
-    }
+      const email = data.email || data.login;
+      const password = data.password;
+      const session = await account.createEmailPasswordSession(email, password);
+      this.setToken(session.$id);
 
-    return { user: userDoc, token: session.$id };
+      const currAccount = await account.get();
+
+      let userDoc;
+      try {
+        userDoc = await databases.getDocument(databaseId, userCollectionId, currAccount.$id);
+      } catch (e) {
+        const safeName = currAccount.name || 'User';
+        userDoc = await databases.createDocument(databaseId, userCollectionId, currAccount.$id, {
+          email: currAccount.email,
+          name: safeName,
+          username: safeName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50) || `user${Math.floor(Math.random() * 10000)}`,
+          avatar: avatars.getInitials(safeName).toString(),
+          status: 'Hey there! I am using Nexus Chat.'
+        });
+      }
+
+      return { user: userDoc, token: session.$id };
+    } catch (err) {
+      throw new Error(mapAppwriteError(err));
+    }
   }
 
   async getMe() {
@@ -65,7 +115,7 @@ class ApiClient {
       const currAccount = await account.get();
       return await databases.getDocument(databaseId, userCollectionId, currAccount.$id);
     } catch (e) {
-      throw new Error('Not logged in');
+      throw new Error(mapAppwriteError(e));
     }
   }
 
@@ -73,7 +123,7 @@ class ApiClient {
     try {
       await account.deleteSession('current');
     } catch(e) {}
-    localStorage.removeItem('nexus_session');
+    this.setToken(null);
   }
 
   async updateProfile(data) {
